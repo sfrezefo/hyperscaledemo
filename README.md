@@ -1,17 +1,13 @@
 # Real-time data with Azure Database for PostgreSQL Hyperscale
 
 ## Abstracts
-This workshop is a simplified version of a very complete
+This workshop is a simplified version of a very complete workshop :
 
-Wide World Importers (WWI) is a traditional brick and mortar business with a long track record of success, generating profits through strong retail store sales of their unique offering of affordable products from around the world and a strong focus on customer relationships.  WWI modernized their business by expanding to online storefronts and experimenting with various marketing tactics to drive online sales. This expansion has made it more challenging to analyze user clickstream data, online ad performance, and other marketing campaigns at scale, and to provide insights to the marketing team in real-time.
+[MCW-Real-time-data-with-Azure-Database-for-PostgreSQL-Hyperscale]( https://github.com/microsoft/MCW-Real-time-data-with-Azure-Database-for-PostgreSQL-Hyperscale)
 
-WWI is interested in learning to use advanced features of the managed PostgreSQL PaaS service on Azure to make their database more scalable and able to handle the rapid ingest of streaming data while simultaneously generating and serving pre-aggregated data for reports.
-
-In this workshop, you will learn how to use advanced features of the managed PostgreSQL PaaS service on Azure to make your database more scalable and able to handle the rapid ingest of streaming data while simultaneously generating and serving pre-aggregated data for reports. 
+The main challenge is to analyze user clickstream data, online ad performance, and other marketing campaigns at scale, and to provide insights to the marketing team in real-time.
+The aim is to learn how to use advanced features of the managed PostgreSQL PaaS service on Azure to make a database more scalable and able to handle the rapid ingest of streaming data while simultaneously generating and serving pre-aggregated data for reports.
 At the end of this workshop, you will be better able to implement a highly scalable, managed open source database solution that can simultaneously handle real-time data and roll-up and serve data.
-
-
-February 2020
 
 ## Target audience
 
@@ -27,16 +23,7 @@ February 2020
 - Azure Cloud Shell
 - pgAdmin
 
-
 ## Getting Started
-
-These instructions will 
-
-
-```Shell
-psql --host=postgreshypersg-c.postgres.database.azure.com \
-   --variable=sslmode=require --port=5432  --dbname=citus --username=citus  -W
-```
 
  we are sharding each of the tables on customer_id column. 
  The sharding logic is handled for you by the Hyperscale server group (enabled by Citus), allowing you to horizontally scale your database across multiple managed Postgres servers. 
@@ -47,6 +34,12 @@ psql --host=postgreshypersg-c.postgres.database.azure.com \
 Create the events raw table to capture every clickstream event. 
 This table is partitioned by event_time since we are using it to store time series data. 
 The script you execute to create the schema creates a partition every 5 minutes, using pg_partman.
+
+```Shell
+psql --host=postgreshypersg-c.postgres.database.azure.com \
+   --variable=sslmode=require --port=5432  --dbname=citus --username=citus  -W
+```
+
 ```sql
 CREATE TABLE events(
     event_id serial,
@@ -66,8 +59,6 @@ partitioning
 SELECT partman.create_parent('public.events', 'event_time', 'native', '5 minutes');
 UPDATE partman.part_config SET infinite_time_partitions = true;
 ```
-
-
 rollup tables
 ```sql
 create two rollup tables for storing aggregated data pulled from the raw events table. 
