@@ -307,4 +307,4 @@ WHERE minute >=date_trunc('day',now())-interval '30 minutes'
     
 ## Authors
 
-* **Serge Frezefond** - [PurpleBooth](https://linnkedin.com/serge.frezefond)
+[Serge Frezefond](https://linnkedin.com/serge.frezefond)
