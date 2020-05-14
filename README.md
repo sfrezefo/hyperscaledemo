@@ -25,20 +25,15 @@ At the end of this workshop, you will be better able to implement a highly scala
 
 ## Getting Started
 
- we are sharding each of the tables on customer_id column. 
- The sharding logic is handled for you by the Hyperscale server group (enabled by Citus), allowing you to horizontally scale your database across multiple managed Postgres servers. 
- This provides you with multi-tenancy because the data is sharded by the same Tenant ID (customer_id).
-  Because we are sharding on the same ID for our raw events table and rollup tables, our data stored in both types of table are automatically co-located for us by Citus. Furthermore, 
- this means that aggregations can be performed locally without crossing network boundaries when we insert our events data into the rollup tables. 
-
-Create the events raw table to capture every clickstream event. 
-This table is partitioned by event_time since we are using it to store time series data. 
-The script you execute to create the schema creates a partition every 5 minutes, using pg_partman.
+we are sharding each of the tables on customer_id column. The sharding logic is handled for you by the Hyperscale server group (enabled by Citus), allowing you to horizontally scale your database across multiple managed Postgres servers. This provides you with multi-tenancy because the data is sharded by the same Tenant ID (customer_id). Because we are sharding on the same ID for our raw events table and rollup tables, our data stored in both types of table are automatically co-located for us by Citus. Furthermore, this means that aggregations can be performed locally without crossing network boundaries when we insert our events data into the rollup tables. 
 
 ```Shell
 psql --host=postgreshypersg-c.postgres.database.azure.com \
    --variable=sslmode=require --port=5432  --dbname=citus --username=citus  -W
 ```
+Create the events raw table to capture every clickstream event. 
+This table is partitioned by event_time since we are using it to store time series data. 
+The script you execute to create the schema creates a partition every 5 minutes, using pg_partman.
 
 ```sql
 CREATE TABLE events(
@@ -53,13 +48,25 @@ CREATE TABLE events(
 )
 PARTITION BY RANGE (event_time);
 ```
-partitioning
+The events table is partitioned by event_time since we are using it to store time series data. 
+
+Partitioning is the key to high performance, as it allows you to break up data into further smaller chunks based on time windows. One of the keys to fast data loading is to avoid using large indexes. Traditionally, you would use block-range (BRIN) indexes to speed up range scans over roughly-sorted data. However, when you have unsorted data, BRIN indexes tend to perform poorly. Partitioning helps keep indexes small. It does this by dividing tables into partitions, avoiding fragmentation of data while maintaining smaller indexes. In addition, it allows you to query only a smaller portion of the data when you run queries for particular time windows, leading to faster SELECT performance.
+
+We automaticaly create a partition every 5 minutes, using pg_partman.
 ```sql
 --Create 5-minutes partitions
 SELECT partman.create_parent('public.events', 'event_time', 'native', '5 minutes');
 UPDATE partman.part_config SET infinite_time_partitions = true;
 ```
-rollup tables
+This event table is distributed(sharded) based on the custommer_id key.
+```sql
+ --shard the events table as well
+ SELECT create_distributed_table('events','customer_id');
+```
+We create two rollup tables for storing aggregated data pulled from the raw events table. Later, you will create rollup functions and schedule them to run periodically. The two tables you will create are:
+
+**rollup_events_5mins: stores aggregated data in 5-minute intervals.**
+
 ```sql
 create two rollup tables for storing aggregated data pulled from the raw events table. 
 Later, you will create rollup functions and schedule them to run periodically.
@@ -77,7 +84,7 @@ CREATE TABLE rollup_events_5min (
  CREATE UNIQUE INDEX rollup_events_5min_unique_idx ON rollup_events_5min(customer_id,event_type,country,browser,minute);
  SELECT create_distributed_table('rollup_events_5min','customer_id');
 ```
-rollup 1h
+**rollup_events_1hr**: stores aggregated data every 1 hour.
 ```sql
  CREATE TABLE rollup_events_1hr (
      customer_id bigint,
@@ -93,13 +100,7 @@ rollup 1h
  CREATE UNIQUE INDEX rollup_events_1hr_unique_idx ON rollup_events_1hr(customer_id,event_type,country,browser,hour);
  SELECT create_distributed_table('rollup_events_1hr','customer_id');
 ```
-distribute
-```sql
- --shard the events table as well
- SELECT create_distributed_table('events','customer_id');
-
-```
-metadata about rollups
+We need to store some metadata about when rollups were last computed.
 ```sql
  CREATE TABLE rollups (
     name text primary key,
@@ -109,7 +110,7 @@ metadata about rollups
 );
 
 ```
-function to find start and end position to compute rollups
+This function will find start and end position to compute rollups
 ```sql
 CREATE OR REPLACE FUNCTION incremental_rollup_window(rollup_name text, OUT window_start bigint, OUT window_end bigint)
 RETURNS record
@@ -158,7 +159,7 @@ BEGIN
 END;
 $function$;
 ```
-enter initial position for the 2 rollups we compute
+we need to  initialize  positions for the 2 rollups we compute.
 ```sql
 -- Entries for the rollup tables so that they are getting tracked in incremental rollup process.
 INSERT INTO rollups (name, event_table_name, event_id_sequence_name)
@@ -254,6 +255,8 @@ SELECT hourly_aggregation();
 ```
  Hyperscale clusters allow us to parallelize our aggregations across shards, 
  then perform a SELECT on a rollup for a particular customer from the dashboard, and have it automatically routed to the appropriate shard.
+
+You will then execute queries against the rollup tables that can be used for WWI's dashboard. This is to demonstrate that queries against the pre-aggregated tables that use HLL and TopN advanced aggregation features result in excellent query speeds and flexibility.
 
 -- the total number of events and count of distinct devices in the last 15 minutes
 ```sql
