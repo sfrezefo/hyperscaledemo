@@ -58,7 +58,7 @@ We automaticaly create a partition every 5 minutes, using pg_partman.
 SELECT partman.create_parent('public.events', 'event_time', 'native', '5 minutes');
 UPDATE partman.part_config SET infinite_time_partitions = true;
 ```
-This event table is distributed(sharded) based on the custommer_id key.
+This event table is also distributed(sharded) based on the custommer_id key. This will allow to benefit from the multinode power of Ps
 ```sql
  --shard the events table as well
  SELECT create_distributed_table('events','customer_id');
@@ -100,7 +100,9 @@ CREATE TABLE rollup_events_5min (
  CREATE UNIQUE INDEX rollup_events_1hr_unique_idx ON rollup_events_1hr(customer_id,event_type,country,browser,hour);
  SELECT create_distributed_table('rollup_events_1hr','customer_id');
 ```
-We need to store some metadata about when rollups were last computed.
+ We are sharding each of the rollup tables on customer_id column. Because we are sharding on the same ID for our raw events table and rollup tables, our data stored in both types of table are automatically co-located for us by Citus. Furthermore, this means that aggregations can be performed locally without crossing network boundaries when we insert our events data into the rollup tables. 
+
+ We need to store some metadata about when rollups were last computed.
 ```sql
  CREATE TABLE rollups (
     name text primary key,
@@ -169,7 +171,11 @@ INSERT INTO rollups (name, event_table_name, event_id_sequence_name)
 VALUES ('rollup_events_1hr', 'events','events_event_id_seq');
 
 ```
-function that actually compute the 5 minutes rollup
+Rollups are an integral piece of this solution because they provide fast, indexed lookups of aggregates where compute-heavy work is performed periodically in the background. Because these rollups are compact, they can easily be consumed by various clients and kept over longer periods of time.
+
+When you look at the SQL scripts for the five_minutely_aggregation and hourly_aggregation functions below, you will notice that we are using incremental aggregation to support late, or incoming, data. This is accomplished by using ON CONFLICT ... DO UPDATE in the INSERT statement.
+
+Here are the function that actually compute the 5 minutes rollup
 ```sql
 CREATE OR REPLACE FUNCTION five_minutely_aggregation(OUT start_id bigint, OUT end_id bigint)
 RETURNS record
@@ -206,7 +212,7 @@ END;
 $function$;
 
 ```
-function that actually compute the one hour rollup
+And here the function that actually compute the one hour rollup. It is the same except datetime is truncated to hour for aggregation.
 ```sql
 CREATE OR REPLACE FUNCTION hourly_aggregation(OUT start_id bigint, OUT end_id bigint)
 RETURNS record
@@ -242,7 +248,7 @@ BEGIN
 END;
 $function$;
 ```
-Schedule a periodic computation fof the rollups
+To schedule periodic aggregation we use pg_cron.
 ```sql
 SELECT cron.schedule('*/5 * * * *', 'SELECT five_minutely_aggregation();');
 SELECT cron.schedule('*/5 * * * *', 'SELECT hourly_aggregation();');
@@ -288,8 +294,10 @@ WHERE hour >=date_trunc('day',now())-interval '2 days'
 GROUP BY hour;
 
 ```
--- the total number of events and count of distinct devices in the last 15 minutes by customer_id.
--- Remember, the data is sharded by tenant (Customer ID):
+Remember, the data is sharded by tenant (Customer ID). As the next two queries have a filter on customer_id, Citus will route the queries to only the node which has the data for that particular customer without needing to touch data for the remaining customers. This leads to faster performance as you need to scan only a small portion of the data.
+
+Let us the total number of events and count of distinct devices in the last 15 minutes for customer_id=1.
+
 ```sql
 SELECT sum(event_count) num_events, 
     ceil(hll_cardinality(hll_union_agg(device_distinct_count))) distinct_devices
@@ -299,7 +307,7 @@ WHERE minute >=now()-interval '15 minutes'
     AND customer_id=1;
 
 ```
--- top devices in the past 30 minutes for customer 2:
+Let us compute the top devices in the past 30 minutes for customer 2:
 ```sql
 SELECT (topn(topn_union_agg(top_devices_1000), 10)).item device_id
 FROM rollup_events_5min
