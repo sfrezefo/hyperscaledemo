@@ -3,21 +3,22 @@
 import pandas as pd
 import psycopg2
 import time
+import sys, getopt
 
 def main(argv):
   '''
-  executes gendata.py -u citus -p Passw0rd -h 'yourpostgreshyperscale-c.postgres.database.azure.com' -p 5432 -d citus
+  executes gendata.py -u citus -p Passw0rd -h 'yourpostgreshyperscale-c.postgres.database.azure.com' -P 5432 -d citus
   this will generate data based on csv files
   
   '''
-username = 'citus'
-password = 'Manager12#'
-host = 'postgreshypersg-c.postgres.database.azure.com'
-port = '5432'
-database = 'citus'
+  username = 'citus'
+  password = 'Manager12#'
+  host = 'postgreshypersg-c.postgres.database.azure.com'
+  port = '5432'
+  database = 'citus'
 
   try:
-      opts, args = getopt.getopt(argv,"hu:p:h:p:d:",["user=","password=","host=","database=","port="])
+      opts, args = getopt.getopt(argv,"hu:p:h:P:d:",["user=","password=","host=","database=","port="])
   except getopt.GetoptError:
     print('test.py -u <username> -p <password> -h <host> -p <port> -d <database>')
     sys.exit(2)
@@ -31,17 +32,17 @@ database = 'citus'
       password = arg
     elif opt in ("-h", "--host"):
       host = arg
-    elif opt in ("-p", "--port"):
+    elif opt in ("-P", "--port"):
       port = int(arg)
     elif opt in ("-d", "--database"):
       database = arg
 
     try:
-        conn = psycopg2.connect(user = "citus",
-                                password = "Manager12#",
-                                host = "postgreshypersg-c.postgres.database.azure.com",
-                                port = "5432",
-                                database = "citus",
+        conn = psycopg2.connect(user = username,
+                                password = password,
+                                host = host,
+                                port = port,
+                                database = database,
                                 sslmode="require")
         cursor = conn.cursor()
         cursor.execute("SELECT version();")
