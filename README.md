@@ -74,6 +74,12 @@ This event table is also distributed(sharded) based on the custommer_id key. Thi
  --shard the events table as well
  SELECT create_distributed_table('events','customer_id');
 ```
+We can now start injecting data into the events table using the gendata.py script.
+```Shell
+./gendata.py -u citus -p Passw0rd \
+              -h 'yourpostgreshypersg-c.postgres.database.azure.com' -p 5432 -d citus
+```
+## Creation of the rollup_events tables containing the aggregated data
 We create two rollup tables for storing aggregated data pulled from the raw events table. Later, you will create rollup functions and schedule them to run periodically. The two tables you will create are:
 
 **rollup_events_5mins: stores aggregated data in 5-minute intervals.**
