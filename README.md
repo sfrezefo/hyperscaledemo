@@ -10,7 +10,13 @@ The main challenge is to analyze user clickstream data, online ad performance, a
 The aim is to learn how to use advanced features of the managed PostgreSQL PaaS service on Azure to make a database more scalable and able to handle the rapid ingest of streaming data while simultaneously generating and serving pre-aggregated data for reports.
 At the end of this workshop, you will be better able to implement a highly scalable, managed open source database solution that can simultaneously handle real-time data and roll-up and serve data.
 
-The complete workshop uses various Azure components : Azure Event Hubs receives marketing events through a kafka API., Azure Databricks runs a notebook to read data fom Event Hub and push it to postgresQL and Azure Data Data Lake Storage. Azure keyvault keeps all the required secrets. PowerBI is then used to build advanced visualizations and export reports to external websites. This is a very interesting workshop that represents a realistic architecture. It requires a full day to go through. A C# program(Kafka producer) is used to simulate the injection of marketing events through the Event Hubs Kafka API.
+The complete workshop uses various Azure components : 
+- Azure Event Hubs receives marketing events through a kafka API.
+- Azure Databricks runs a notebook to read data from Event Hub and push it to postgresQL and Azure Data Data Lake Storage.
+- Azure keyvault keeps all the required secrets.
+- PowerBI is then used to build advanced visualizations and export reports to external websites. 
+- A C# program (Kafka producer) is used to simulate the injection of marketing events through the Event Hubs Kafka API.
+This is a very interesting workshop that represents a realistic architecture. It requires a full day to go through.
 
 The aim of this simplified version of the workshop is to focus on Azure Database for PostgreSQL Hyperscale. A simple python program is used to directly inject data in postgreSQL. This means there is no needs for Azure Event Hubs, Azure Databricks, Azure keyvault or a C# program.
 To start injecting data :
